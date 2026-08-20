@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
 const MOIS = [
@@ -248,9 +249,10 @@ export default function Passe({ session }) {
         ) : (
           <div className="space-y-2">
             {collectionsArchivees.map((c) => (
-              <div
+              <Link
+                to={`/collection/${c.id}`}
                 key={c.id}
-                className="rounded-[3px] px-4 py-3 bg-paper-card/60"
+                className="block rounded-[3px] px-4 py-3 bg-paper-card/60"
               >
                 <p className="font-display text-[15px] text-ink">
                   {c.title}
@@ -263,7 +265,7 @@ export default function Passe({ session }) {
                     ? ` → ${new Date(c.ended_at).toLocaleDateString("fr-FR")}`
                     : ""}
                 </p>
-              </div>
+              </Link>
             ))}
           </div>
         )}

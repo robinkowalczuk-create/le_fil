@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
 const FREQUENCES = [
@@ -23,6 +24,8 @@ export default function Accueil({ session }) {
   const [freqSelect, setFreqSelect] = useState(["jour"]);
   const [collectionId, setCollectionId] = useState("");
   const [dateEntree, setDateEntree] = useState(todayISO());
+  const [photoFiles, setPhotoFiles] = useState([]);
+  const fileInputRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState("");
 
@@ -30,6 +33,7 @@ export default function Accueil({ session }) {
   const [showNewCollection, setShowNewCollection] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newTemplateKey, setNewTemplateKey] = useState("");
+  const [newExtraFields, setNewExtraFields] = useState({});
   const [creatingCollection, setCreatingCollection] = useState(false);
 
   const chargerCollections = async () => {
@@ -65,7 +69,7 @@ export default function Accueil({ session }) {
   const chargerTemplates = async () => {
     const { data, error } = await supabase
       .from("lf_collection_templates")
-      .select("key, label, icon");
+      .select("key, label, icon, fields");
     if (!error) setTemplates(data || []);
   };
 
@@ -92,6 +96,8 @@ export default function Accueil({ session }) {
     }
   };
 
+  const selectedTemplate = templates.find((t) => t.key === newTemplateKey);
+
   const creerCollection = async () => {
     if (!newTitle.trim()) return;
     setCreatingCollection(true);
@@ -103,6 +109,7 @@ export default function Accueil({ session }) {
         template_key: newTemplateKey || null,
         status: "active",
         started_at: todayISO(),
+        extra_fields: newExtraFields,
       })
       .select()
       .single();
@@ -117,9 +124,30 @@ export default function Accueil({ session }) {
 
     setNewTitle("");
     setNewTemplateKey("");
+    setNewExtraFields({});
     setShowNewCollection(false);
     await chargerCollections();
     setCollectionId(data.id);
+  };
+
+  const uploaderPhotos = async (entryId, colId) => {
+    for (let i = 0; i < photoFiles.length; i++) {
+      const file = photoFiles[i];
+      const path = `${session.user.id}/${entryId}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("fil-photos")
+        .upload(path, file);
+      if (uploadError) {
+        console.error(uploadError);
+        continue;
+      }
+      await supabase.from("lf_entry_photos").insert({
+        entry_id: entryId,
+        collection_id: colId || null,
+        url: path,
+        position: i,
+      });
+    }
   };
 
   const ajouterEntree = async () => {
@@ -127,24 +155,34 @@ export default function Accueil({ session }) {
     setSaving(true);
     setFeedback("");
 
-    const { error } = await supabase.from("lf_entries").insert({
-      user_id: session.user.id,
-      collection_id: collectionId || null,
-      content: texte.trim(),
-      event_date: dateEntree,
-      frequencies: freqSelect,
-    });
-
-    setSaving(false);
+    const { data: entry, error } = await supabase
+      .from("lf_entries")
+      .insert({
+        user_id: session.user.id,
+        collection_id: collectionId || null,
+        content: texte.trim(),
+        event_date: dateEntree,
+        frequencies: freqSelect,
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error(error);
+      setSaving(false);
       setFeedback("Erreur, réessaie.");
       return;
     }
 
+    if (photoFiles.length > 0) {
+      await uploaderPhotos(entry.id, collectionId);
+    }
+
+    setSaving(false);
     setTexte("");
     setDateEntree(todayISO());
+    setPhotoFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setFeedback("Ajouté au fil.");
     chargerCollections();
     setTimeout(() => setFeedback(""), 2000);
@@ -209,9 +247,10 @@ export default function Accueil({ session }) {
         ) : (
           <div className="fil-scroll flex gap-3 overflow-x-auto pl-6 pr-2 -mr-6 snap-x">
             {collections.map((c) => (
-              <div
+              <Link
+                to={`/collection/${c.id}`}
                 key={c.id}
-                className="snap-start shrink-0 w-[168px] rounded-[3px] overflow-hidden bg-paper-card"
+                className="snap-start shrink-0 w-[168px] rounded-[3px] overflow-hidden bg-paper-card block"
               >
                 <div
                   className="h-[86px]"
@@ -232,7 +271,7 @@ export default function Accueil({ session }) {
                     </p>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
             <div className="shrink-0 w-4" />
           </div>
@@ -313,7 +352,10 @@ export default function Accueil({ session }) {
               />
               <select
                 value={newTemplateKey}
-                onChange={(e) => setNewTemplateKey(e.target.value)}
+                onChange={(e) => {
+                  setNewTemplateKey(e.target.value);
+                  setNewExtraFields({});
+                }}
                 className="font-mono text-[10.5px] tracking-wide text-ink-muted bg-transparent outline-none"
               >
                 <option value="">Personnalisé</option>
@@ -323,6 +365,27 @@ export default function Accueil({ session }) {
                   </option>
                 ))}
               </select>
+
+              {selectedTemplate?.fields?.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  {selectedTemplate.fields.map((f) => (
+                    <input
+                      key={f.key}
+                      type="text"
+                      placeholder={f.label}
+                      value={newExtraFields[f.key] || ""}
+                      onChange={(e) =>
+                        setNewExtraFields((prev) => ({
+                          ...prev,
+                          [f.key]: e.target.value,
+                        }))
+                      }
+                      className="font-body w-full px-3 py-1.5 rounded-[3px] bg-paper-card outline-none text-[12.5px] text-ink placeholder:text-ink-faint"
+                    />
+                  ))}
+                </div>
+              )}
+
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setShowNewCollection(false)}
@@ -340,6 +403,23 @@ export default function Accueil({ session }) {
               </div>
             </div>
           )}
+
+          <div className="flex items-center gap-3 mt-3">
+            <label className="font-body text-[12px] text-ink-muted cursor-pointer">
+              📷{" "}
+              {photoFiles.length > 0
+                ? `${photoFiles.length} photo(s)`
+                : "Ajouter des photos"}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => setPhotoFiles(Array.from(e.target.files))}
+              />
+            </label>
+          </div>
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-ink-faint/20">
             {feedback && (
