@@ -10,15 +10,27 @@ const FREQUENCES = [
 
 const SWATCHES = ["#7C8471", "#A5822F", "#5C6B73", "#8C2F26", "#6B5B73"];
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function Accueil({ session }) {
   const [collections, setCollections] = useState([]);
   const [loadingCollections, setLoadingCollections] = useState(true);
+  const [templates, setTemplates] = useState([]);
 
   const [texte, setTexte] = useState("");
   const [freqSelect, setFreqSelect] = useState(["jour"]);
   const [collectionId, setCollectionId] = useState("");
+  const [dateEntree, setDateEntree] = useState(todayISO());
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState("");
+
+  // formulaire "nouvelle collection"
+  const [showNewCollection, setShowNewCollection] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newTemplateKey, setNewTemplateKey] = useState("");
+  const [creatingCollection, setCreatingCollection] = useState(false);
 
   const chargerCollections = async () => {
     setLoadingCollections(true);
@@ -36,7 +48,6 @@ export default function Accueil({ session }) {
       return;
     }
 
-    // compte les entrées de chaque collection en cours
     const withCounts = await Promise.all(
       (data || []).map(async (c, i) => {
         const { count } = await supabase
@@ -51,8 +62,16 @@ export default function Accueil({ session }) {
     setLoadingCollections(false);
   };
 
+  const chargerTemplates = async () => {
+    const { data, error } = await supabase
+      .from("lf_collection_templates")
+      .select("key, label, icon");
+    if (!error) setTemplates(data || []);
+  };
+
   useEffect(() => {
     chargerCollections();
+    chargerTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -60,6 +79,47 @@ export default function Accueil({ session }) {
     setFreqSelect((prev) =>
       prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
     );
+  };
+
+  const handleSelectChange = (e) => {
+    const val = e.target.value;
+    if (val === "__new__") {
+      setShowNewCollection(true);
+      setCollectionId("");
+    } else {
+      setShowNewCollection(false);
+      setCollectionId(val);
+    }
+  };
+
+  const creerCollection = async () => {
+    if (!newTitle.trim()) return;
+    setCreatingCollection(true);
+    const { data, error } = await supabase
+      .from("lf_collections")
+      .insert({
+        user_id: session.user.id,
+        title: newTitle.trim(),
+        template_key: newTemplateKey || null,
+        status: "active",
+        started_at: todayISO(),
+      })
+      .select()
+      .single();
+
+    setCreatingCollection(false);
+
+    if (error) {
+      console.error(error);
+      setFeedback("Erreur à la création de la collection.");
+      return;
+    }
+
+    setNewTitle("");
+    setNewTemplateKey("");
+    setShowNewCollection(false);
+    await chargerCollections();
+    setCollectionId(data.id);
   };
 
   const ajouterEntree = async () => {
@@ -71,7 +131,7 @@ export default function Accueil({ session }) {
       user_id: session.user.id,
       collection_id: collectionId || null,
       content: texte.trim(),
-      event_date: new Date().toISOString().slice(0, 10),
+      event_date: dateEntree,
       frequencies: freqSelect,
     });
 
@@ -84,6 +144,7 @@ export default function Accueil({ session }) {
     }
 
     setTexte("");
+    setDateEntree(todayISO());
     setFeedback("Ajouté au fil.");
     chargerCollections();
     setTimeout(() => setFeedback(""), 2000);
@@ -91,7 +152,6 @@ export default function Accueil({ session }) {
 
   return (
     <div className="max-w-md mx-auto relative pb-28">
-      {/* Fil vertical d'arrière-plan */}
       <svg
         className="absolute left-8 top-0 pointer-events-none"
         width="2"
@@ -111,7 +171,6 @@ export default function Accueil({ session }) {
         />
       </svg>
 
-      {/* Header */}
       <header className="relative px-6 pt-10 pb-8">
         <div className="ml-6">
           <p className="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-faint">
@@ -130,7 +189,6 @@ export default function Accueil({ session }) {
         </div>
       </header>
 
-      {/* En cours */}
       <section className="relative px-6 mb-9">
         <div className="ml-6 flex items-center gap-2 mb-4">
           <span className="inline-block w-2 h-2 rounded-full bg-thread" />
@@ -145,7 +203,8 @@ export default function Accueil({ session }) {
           </p>
         ) : collections.length === 0 ? (
           <p className="ml-6 font-body text-[13px] text-ink-faint italic">
-            Aucune thématique en cours. Crée-en une depuis une entrée.
+            Aucune thématique en cours. Crée-en une depuis la saisie
+            ci-dessous.
           </p>
         ) : (
           <div className="fil-scroll flex gap-3 overflow-x-auto pl-6 pr-2 -mr-6 snap-x">
@@ -180,7 +239,6 @@ export default function Accueil({ session }) {
         )}
       </section>
 
-      {/* Zone de saisie */}
       <section className="relative px-6 mb-10">
         <div className="ml-6 rounded-[3px] p-4 relative bg-paper-card-alt">
           <span
@@ -215,10 +273,23 @@ export default function Accueil({ session }) {
             })}
           </div>
 
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-ink-faint/20">
+          <div className="flex items-center gap-2 mt-3">
+            <span className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+              Date
+            </span>
+            <input
+              type="date"
+              value={dateEntree}
+              max={todayISO()}
+              onChange={(e) => setDateEntree(e.target.value)}
+              className="font-mono text-[12px] bg-transparent outline-none text-ink-muted border-b border-ink-faint/40"
+            />
+          </div>
+
+          <div className="mt-3">
             <select
-              value={collectionId}
-              onChange={(e) => setCollectionId(e.target.value)}
+              value={showNewCollection ? "__new__" : collectionId}
+              onChange={handleSelectChange}
               className="font-mono text-[10.5px] tracking-wide text-ink-muted bg-transparent outline-none"
             >
               <option value="">Sans collection</option>
@@ -227,22 +298,62 @@ export default function Accueil({ session }) {
                   {c.title}
                 </option>
               ))}
+              <option value="__new__">+ Nouvelle collection</option>
             </select>
+          </div>
 
-            <div className="flex items-center gap-3">
-              {feedback && (
-                <span className="font-mono text-[10px] text-ink-faint">
-                  {feedback}
-                </span>
-              )}
-              <button
-                onClick={ajouterEntree}
-                disabled={saving || !texte.trim()}
-                className="font-body text-[12.5px] font-medium px-4 py-1.5 rounded-full bg-thread text-paper disabled:opacity-50"
+          {showNewCollection && (
+            <div className="mt-3 p-3 rounded-[3px] bg-paper space-y-2">
+              <input
+                type="text"
+                placeholder="Titre de la collection"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                className="font-body w-full px-3 py-2 rounded-[3px] bg-paper-card outline-none text-[13px] text-ink placeholder:text-ink-faint"
+              />
+              <select
+                value={newTemplateKey}
+                onChange={(e) => setNewTemplateKey(e.target.value)}
+                className="font-mono text-[10.5px] tracking-wide text-ink-muted bg-transparent outline-none"
               >
-                {saving ? "..." : "Ajouter au fil"}
-              </button>
+                <option value="">Personnalisé</option>
+                {templates.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.icon} {t.label}
+                  </option>
+                ))}
+              </select>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowNewCollection(false)}
+                  className="font-mono text-[10px] text-ink-faint uppercase"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={creerCollection}
+                  disabled={creatingCollection || !newTitle.trim()}
+                  className="font-body text-[12px] font-medium px-3 py-1.5 rounded-full bg-thread text-paper disabled:opacity-50"
+                >
+                  {creatingCollection ? "..." : "Créer"}
+                </button>
+              </div>
             </div>
+          )}
+
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-ink-faint/20">
+            {feedback && (
+              <span className="font-mono text-[10px] text-ink-faint">
+                {feedback}
+              </span>
+            )}
+            <button
+              onClick={ajouterEntree}
+              disabled={saving || !texte.trim()}
+              className="font-body text-[12.5px] font-medium px-4 py-1.5 rounded-full bg-thread text-paper disabled:opacity-50 ml-auto"
+            >
+              {saving ? "..." : "Ajouter au fil"}
+            </button>
           </div>
         </div>
       </section>

@@ -14,8 +14,8 @@ export default function App() {
           <div className="min-h-screen bg-paper">
             <Routes>
               <Route path="/" element={<Accueil session={session} />} />
-              <Route path="/passe" element={<Passe />} />
-              <Route path="/cercles" element={<Cercles />} />
+              <Route path="/passe" element={<Passe session={session} />} />
+              <Route path="/cercles" element={<Cercles session={session} />} />
             </Routes>
             <BottomNav />
           </div>
