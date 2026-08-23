@@ -90,7 +90,7 @@ export default function Cercles({ session }) {
   };
 
   return (
-    <div className="max-w-md mx-auto px-6 pt-10 pb-28">
+    <div className="max-w-md md:max-w-3xl mx-auto px-6 pt-10 pb-28 md:pb-16">
       <h1 className="font-display text-[28px] text-ink mb-1">Cercles</h1>
       <p className="font-body text-[13px] text-ink-muted mb-6">
         Regroupe famille et amis pour leur partager des entrées ou des
@@ -146,7 +146,7 @@ export default function Cercles({ session }) {
           Aucun cercle pour l'instant.
         </p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
           {circles.map((c) => (
             <div key={c.id} className="rounded-[3px] bg-paper-card p-4">
               <p className="font-display text-[17px] text-ink mb-2">

@@ -10,7 +10,7 @@ const items = [
 
 export default function BottomNav() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t border-ink-faint/20 bg-paper">
+    <nav className="fixed bottom-0 left-0 right-0 border-t border-ink-faint/20 bg-paper md:hidden">
       <div className="max-w-md mx-auto flex justify-around py-3">
         {items.map((item) => (
           <NavLink

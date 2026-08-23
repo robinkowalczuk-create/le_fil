@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthGate from "./components/AuthGate";
 import BottomNav from "./components/BottomNav";
+import Sidebar from "./components/Sidebar";
 import Accueil from "./pages/Accueil";
 import Passe from "./pages/Passe";
 import Cercles from "./pages/Cercles";
@@ -13,18 +14,27 @@ export default function App() {
     <AuthGate>
       {(session) => (
         <BrowserRouter>
-          <div className="min-h-screen bg-paper">
-            <Routes>
-              <Route path="/" element={<Accueil session={session} />} />
-              <Route path="/passe" element={<Passe session={session} />} />
-              <Route path="/cercles" element={<Cercles session={session} />} />
-              <Route path="/projets" element={<Projets session={session} />} />
-              <Route
-                path="/collection/:id"
-                element={<CollectionDetail session={session} />}
-              />
-            </Routes>
-            <BottomNav />
+          <div className="min-h-screen bg-paper md:flex">
+            <Sidebar />
+            <div className="flex-1 md:ml-56">
+              <Routes>
+                <Route path="/" element={<Accueil session={session} />} />
+                <Route path="/passe" element={<Passe session={session} />} />
+                <Route
+                  path="/projets"
+                  element={<Projets session={session} />}
+                />
+                <Route
+                  path="/cercles"
+                  element={<Cercles session={session} />}
+                />
+                <Route
+                  path="/collection/:id"
+                  element={<CollectionDetail session={session} />}
+                />
+              </Routes>
+              <BottomNav />
+            </div>
           </div>
         </BrowserRouter>
       )}

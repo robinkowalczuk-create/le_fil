@@ -126,7 +126,7 @@ export default function CollectionDetail({ session }) {
   }
 
   return (
-    <div className="max-w-md mx-auto px-6 pt-10 pb-28">
+    <div className="max-w-md md:max-w-3xl mx-auto px-6 pt-10 pb-28 md:pb-16">
       <button
         onClick={() => navigate(-1)}
         className="font-mono text-[10px] uppercase text-ink-faint mb-4"
@@ -222,7 +222,7 @@ export default function CollectionDetail({ session }) {
           <h2 className="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-faint mb-3">
             Galerie
           </h2>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-1.5">
             {photos.map((p) => (
               <div
                 key={p.id}

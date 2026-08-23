@@ -183,7 +183,7 @@ export default function Accueil({ session }) {
   };
 
   return (
-    <div className="max-w-md mx-auto relative pb-28">
+    <div className="max-w-md md:max-w-4xl mx-auto relative pb-28 md:pb-16">
       <svg
         className="absolute left-8 top-0 pointer-events-none"
         width="2"
@@ -239,15 +239,15 @@ export default function Accueil({ session }) {
             ci-dessous.
           </p>
         ) : (
-          <div className="fil-scroll flex gap-3 overflow-x-auto pl-6 pr-2 -mr-6 snap-x">
+          <div className="fil-scroll flex gap-3 overflow-x-auto pl-6 pr-2 -mr-6 snap-x md:grid md:grid-cols-3 lg:grid-cols-4 md:gap-4 md:overflow-visible md:pr-0 md:mr-0">
             {collections.map((c) => (
               <Link
                 to={`/collection/${c.id}`}
                 key={c.id}
-                className="snap-start shrink-0 w-[168px] rounded-[3px] overflow-hidden bg-paper-card block"
+                className="snap-start shrink-0 w-[168px] md:w-auto md:shrink rounded-[3px] overflow-hidden bg-paper-card block"
               >
                 <div
-                  className="h-[86px]"
+                  className="h-[86px] md:h-[110px]"
                   style={{
                     background: `linear-gradient(160deg, ${c.swatch} 0%, ${c.swatch}CC 100%)`,
                   }}
@@ -267,12 +267,12 @@ export default function Accueil({ session }) {
                 </div>
               </Link>
             ))}
-            <div className="shrink-0 w-4" />
+            <div className="shrink-0 w-4 md:hidden" />
           </div>
         )}
       </section>
 
-      <section className="relative px-6 mb-10">
+      <section className="relative px-6 mb-10 md:max-w-lg">
         <div className="ml-6 rounded-[3px] p-4 relative bg-paper-card-alt">
           <span
             className="absolute rounded-full bg-thread border-2 border-paper"

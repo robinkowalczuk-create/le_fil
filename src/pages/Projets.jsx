@@ -129,11 +129,13 @@ export default function Projets({ session }) {
   const statusLabel = { in_progress: "En cours", done: "Tenue", abandoned: "Abandonnée" };
 
   return (
-    <div className="max-w-md mx-auto px-6 pt-10 pb-28">
+    <div className="max-w-md md:max-w-4xl mx-auto px-6 pt-10 pb-28 md:pb-16">
       <h1 className="font-display text-[28px] text-ink mb-1">Projets</h1>
       <p className="font-body text-[13px] text-ink-muted mb-8">
         Ce que tu te promets, et ce que tu prépares.
       </p>
+
+      <div className="md:grid md:grid-cols-2 md:gap-10">
 
       {/* Résolutions */}
       <section className="mb-10">
@@ -281,6 +283,7 @@ export default function Projets({ session }) {
           ))}
         </div>
       </section>
+      </div>
     </div>
   );
 }

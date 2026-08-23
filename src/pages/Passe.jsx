@@ -331,7 +331,7 @@ export default function Passe({ session }) {
   };
 
   return (
-    <div className="max-w-md mx-auto px-6 pt-10 pb-28">
+    <div className="max-w-md md:max-w-4xl mx-auto px-6 pt-10 pb-28 md:pb-16">
       <h1 className="font-display text-[28px] text-ink mb-1">
         Consulter le passé
       </h1>
@@ -347,7 +347,7 @@ export default function Passe({ session }) {
           Rien à relire pour l'instant.
         </p>
       ) : (
-        <div className="space-y-3 mb-10">
+        <div className="space-y-3 mb-10 md:max-w-2xl">
           {annees.map((y) => {
             const isYearOpen = expandedYear === y;
             const moisKeys = Object.keys(arbre[y].mois).sort((a, b) => b - a);
@@ -501,7 +501,7 @@ export default function Passe({ session }) {
             Aucune collection terminée pour l'instant.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3 md:space-y-0">
             {collectionsArchivees.map((c) => (
               <Link
                 to={`/collection/${c.id}`}
