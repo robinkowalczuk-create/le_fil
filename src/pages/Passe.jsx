@@ -7,12 +7,7 @@ const MOIS = [
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
-const ONGLETS = [
-  { value: "jour", label: "Jours" },
-  { value: "semaine", label: "Semaines" },
-  { value: "mois", label: "Mois" },
-  { value: "annee", label: "Années" },
-];
+const FREQ_LABEL = { jour: "Jour", semaine: "Semaine", mois: "Mois", annee: "Année" };
 
 function getISOWeek(dateStr) {
   const d = new Date(dateStr + "T00:00:00Z");
@@ -22,25 +17,20 @@ function getISOWeek(dateStr) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-function labelPourEntree(entry) {
-  const d = new Date(entry.event_date + "T00:00:00");
-  switch (entry.frequency) {
-    case "jour":
-      return d.toLocaleDateString("fr-FR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      });
-    case "semaine":
-      return `Semaine ${getISOWeek(entry.event_date)} · ${d.getFullYear()}`;
-    case "mois":
-      return `${MOIS[d.getMonth()]} ${d.getFullYear()}`;
-    case "annee":
-      return `${d.getFullYear()}`;
-    default:
-      return entry.event_date;
-  }
+function labelJour(dateStr) {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
+
+const styleParFrequence = {
+  jour: "bg-paper border-l-2 border-ink-faint/40",
+  semaine: "bg-paper-card",
+  mois: "bg-paper-card-alt",
+  annee: "bg-thread/10 border border-thread/30",
+};
 
 export default function Passe({ session }) {
   const [entries, setEntries] = useState([]);
@@ -49,8 +39,9 @@ export default function Passe({ session }) {
   const [collectionsArchivees, setCollectionsArchivees] = useState([]);
   const [circles, setCircles] = useState([]);
 
-  const [activeTab, setActiveTab] = useState("jour");
   const [expandedYear, setExpandedYear] = useState(null);
+  const [expandedMonth, setExpandedMonth] = useState(null);
+  const [expandedWeek, setExpandedWeek] = useState(null);
 
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -104,22 +95,71 @@ export default function Passe({ session }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const entreesOnglet = useMemo(
-    () => entries.filter((e) => e.frequency === activeTab),
-    [entries, activeTab]
-  );
+  // Construit l'arbre Année > Mois > Semaine > Jour
+  const arbre = useMemo(() => {
+    const parAnnee = {};
+    for (const e of entries) {
+      const d = new Date(e.event_date + "T00:00:00");
+      const y = d.getFullYear();
+      parAnnee[y] = parAnnee[y] || { annee: [], mois: {} };
 
-  const parAnnee = useMemo(() => {
-    const acc = {};
-    for (const e of entreesOnglet) {
-      const y = new Date(e.event_date).getFullYear();
-      acc[y] = acc[y] || [];
-      acc[y].push(e);
+      if (e.frequency === "annee") {
+        parAnnee[y].annee.push(e);
+        continue;
+      }
+
+      const m = d.getMonth();
+      parAnnee[y].mois[m] = parAnnee[y].mois[m] || { mois: [], semaines: {} };
+
+      if (e.frequency === "mois") {
+        parAnnee[y].mois[m].mois.push(e);
+        continue;
+      }
+
+      const w = getISOWeek(e.event_date);
+      parAnnee[y].mois[m].semaines[w] = parAnnee[y].mois[m].semaines[w] || {
+        semaine: [],
+        jours: [],
+      };
+
+      if (e.frequency === "semaine") {
+        parAnnee[y].mois[m].semaines[w].semaine.push(e);
+      } else {
+        parAnnee[y].mois[m].semaines[w].jours.push(e);
+      }
     }
-    return acc;
-  }, [entreesOnglet]);
+    return parAnnee;
+  }, [entries]);
 
-  const annees = Object.keys(parAnnee).sort((a, b) => b - a);
+  const annees = Object.keys(arbre).sort((a, b) => b - a);
+
+  const compterAnnee = (y) => {
+    const bloc = arbre[y];
+    let total = bloc.annee.length;
+    for (const m of Object.keys(bloc.mois)) {
+      total += bloc.mois[m].mois.length;
+      for (const w of Object.keys(bloc.mois[m].semaines)) {
+        total += bloc.mois[m].semaines[w].semaine.length;
+        total += bloc.mois[m].semaines[w].jours.length;
+      }
+    }
+    return total;
+  };
+
+  const compterMois = (y, m) => {
+    const bloc = arbre[y].mois[m];
+    let total = bloc.mois.length;
+    for (const w of Object.keys(bloc.semaines)) {
+      total += bloc.semaines[w].semaine.length;
+      total += bloc.semaines[w].jours.length;
+    }
+    return total;
+  };
+
+  const compterSemaine = (y, m, w) => {
+    const bloc = arbre[y].mois[m].semaines[w];
+    return bloc.semaine.length + bloc.jours.length;
+  };
 
   const commencerEdition = (e) => {
     setEditingId(e.id);
@@ -163,19 +203,131 @@ export default function Passe({ session }) {
     }, 1200);
   };
 
-  const styleParFrequence = (freq) => {
-    switch (freq) {
-      case "jour":
-        return "bg-paper border-l-2 border-ink-faint/40";
-      case "semaine":
-        return "bg-paper-card";
-      case "mois":
-        return "bg-paper-card-alt";
-      case "annee":
-        return "bg-thread/10 border border-thread/30";
-      default:
-        return "bg-paper";
-    }
+  const EntryCard = ({ e, labelOverride }) => {
+    const isEditing = editingId === e.id;
+    return (
+      <div
+        key={e.id}
+        className={`rounded-[3px] p-3 ${styleParFrequence[e.frequency]}`}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <span className="font-mono text-[10px] text-ink-faint">
+            {labelOverride}
+            {e.lf_collections?.title ? ` · ${e.lf_collections.title}` : ""}
+          </span>
+          {!isEditing && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => commencerEdition(e)}
+                className="font-mono text-[9px] uppercase text-ink-muted"
+              >
+                Modifier
+              </button>
+              <button
+                onClick={() =>
+                  setShareOpenFor(shareOpenFor === e.id ? null : e.id)
+                }
+                className="font-mono text-[9px] uppercase text-thread"
+              >
+                Partager
+              </button>
+            </div>
+          )}
+        </div>
+
+        {isEditing ? (
+          <div className="space-y-2 mt-2">
+            <textarea
+              value={editContent}
+              onChange={(ev) => setEditContent(ev.target.value)}
+              rows={3}
+              className="font-body w-full bg-paper rounded-[3px] p-2 outline-none text-[13.5px] text-ink resize-none"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(FREQ_LABEL).map(([val, lbl]) => (
+                <button
+                  key={val}
+                  onClick={() => setEditFrequency(val)}
+                  className={`font-mono text-[9px] uppercase px-2 py-1 rounded-full border ${
+                    editFrequency === val
+                      ? "bg-thread text-paper border-thread"
+                      : "text-ink-muted border-ink-faint"
+                  }`}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="date"
+                value={editDate}
+                onChange={(ev) => setEditDate(ev.target.value)}
+                className="font-mono text-[11px] bg-transparent outline-none text-ink-muted border-b border-ink-faint/40"
+              />
+              <select
+                value={editCollectionId}
+                onChange={(ev) => setEditCollectionId(ev.target.value)}
+                className="font-mono text-[10px] bg-transparent outline-none text-ink-muted"
+              >
+                <option value="">Sans collection</option>
+                {collections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setEditingId(null)}
+                className="font-mono text-[10px] text-ink-faint uppercase"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => enregistrerEdition(e.id)}
+                disabled={savingEdit}
+                className="font-body text-[12px] font-medium px-3 py-1 rounded-full bg-thread text-paper disabled:opacity-50"
+              >
+                {savingEdit ? "..." : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="font-body text-[13.5px] text-ink leading-relaxed">
+            {e.content}
+          </p>
+        )}
+
+        {!isEditing && shareOpenFor === e.id && (
+          <div className="mt-2 pt-2 border-t border-ink-faint/20">
+            {circles.length === 0 ? (
+              <p className="font-mono text-[10px] text-ink-faint">
+                Crée d'abord un cercle dans l'onglet Cercles.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {circles.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => partager(e.id, c.id)}
+                    className="font-mono text-[9px] uppercase px-2 py-1 rounded-full border border-thread text-thread"
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {shareFeedback && (
+              <p className="font-mono text-[9px] text-ink-faint mt-1">
+                {shareFeedback}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -183,41 +335,22 @@ export default function Passe({ session }) {
       <h1 className="font-display text-[28px] text-ink mb-1">
         Consulter le passé
       </h1>
-      <p className="font-body text-[13px] text-ink-muted mb-6">
-        Relis tes jours, tes semaines, tes mois ou tes années.
+      <p className="font-body text-[13px] text-ink-muted mb-8">
+        Les jours dans leur semaine, les semaines dans leur mois, les mois
+        dans leur année.
       </p>
-
-      <div className="flex gap-1.5 mb-7 flex-wrap">
-        {ONGLETS.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => {
-              setActiveTab(o.value);
-              setExpandedYear(null);
-              setEditingId(null);
-            }}
-            className={`font-mono text-[10.5px] tracking-[0.1em] uppercase px-3 py-1.5 rounded-full border transition-colors ${
-              activeTab === o.value
-                ? "bg-thread text-paper border-thread"
-                : "text-ink-muted border-ink-faint"
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
 
       {loading ? (
         <p className="font-body text-[13px] text-ink-faint">Chargement...</p>
       ) : annees.length === 0 ? (
         <p className="font-body text-[13px] text-ink-faint italic mb-10">
-          Rien à relire ici pour l'instant.
+          Rien à relire pour l'instant.
         </p>
       ) : (
         <div className="space-y-3 mb-10">
           {annees.map((y) => {
             const isYearOpen = expandedYear === y;
-            const liste = parAnnee[y];
+            const moisKeys = Object.keys(arbre[y].mois).sort((a, b) => b - a);
 
             return (
               <div
@@ -225,14 +358,18 @@ export default function Passe({ session }) {
                 className="rounded-[3px] bg-paper-card/60 overflow-hidden"
               >
                 <button
-                  onClick={() => setExpandedYear(isYearOpen ? null : y)}
+                  onClick={() => {
+                    setExpandedYear(isYearOpen ? null : y);
+                    setExpandedMonth(null);
+                    setExpandedWeek(null);
+                  }}
                   className="w-full flex items-center justify-between px-4 py-3"
                 >
                   <span className="font-display text-[18px] text-ink">
                     {y}
                   </span>
                   <span className="font-mono text-[10px] text-ink-faint">
-                    {liste.length} entrées {isYearOpen ? "▲" : "▼"}
+                    {compterAnnee(y)} entrées {isYearOpen ? "▲" : "▼"}
                   </span>
                 </button>
 
@@ -241,145 +378,104 @@ export default function Passe({ session }) {
                     <button
                       disabled
                       title="Bientôt disponible"
-                      className="font-mono text-[10px] tracking-wide uppercase px-2.5 py-1 rounded-full border border-ink-faint/40 text-ink-faint opacity-60 mb-1"
+                      className="font-mono text-[10px] tracking-wide uppercase px-2.5 py-1 rounded-full border border-ink-faint/40 text-ink-faint opacity-60"
                     >
                       ✦ Résumé (bientôt)
                     </button>
 
-                    {liste.map((e) => {
-                      const isEditing = editingId === e.id;
+                    {arbre[y].annee.map((e) => (
+                      <EntryCard key={e.id} e={e} labelOverride={y} />
+                    ))}
+
+                    {moisKeys.map((m) => {
+                      const monthKey = `${y}-${m}`;
+                      const isMonthOpen = expandedMonth === monthKey;
+                      const semaineKeys = Object.keys(
+                        arbre[y].mois[m].semaines
+                      ).sort((a, b) => b - a);
+
                       return (
                         <div
-                          key={e.id}
-                          className={`rounded-[3px] p-3 ${styleParFrequence(
-                            e.frequency
-                          )}`}
+                          key={m}
+                          className="rounded-[3px] bg-paper overflow-hidden"
                         >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-mono text-[10px] text-ink-faint">
-                              {labelPourEntree(e)}
-                              {e.lf_collections?.title
-                                ? ` · ${e.lf_collections.title}`
-                                : ""}
+                          <button
+                            onClick={() => {
+                              setExpandedMonth(
+                                isMonthOpen ? null : monthKey
+                              );
+                              setExpandedWeek(null);
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2.5"
+                          >
+                            <span className="font-body text-[14px] text-ink">
+                              {MOIS[m]}
                             </span>
-                            {!isEditing && (
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => commencerEdition(e)}
-                                  className="font-mono text-[9px] uppercase text-ink-muted"
-                                >
-                                  Modifier
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    setShareOpenFor(
-                                      shareOpenFor === e.id ? null : e.id
-                                    )
-                                  }
-                                  className="font-mono text-[9px] uppercase text-thread"
-                                >
-                                  Partager
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                            <span className="font-mono text-[10px] text-ink-faint">
+                              {compterMois(y, m)} {isMonthOpen ? "▲" : "▼"}
+                            </span>
+                          </button>
 
-                          {isEditing ? (
-                            <div className="space-y-2 mt-2">
-                              <textarea
-                                value={editContent}
-                                onChange={(ev) =>
-                                  setEditContent(ev.target.value)
-                                }
-                                rows={3}
-                                className="font-body w-full bg-paper rounded-[3px] p-2 outline-none text-[13.5px] text-ink resize-none"
-                              />
-                              <div className="flex flex-wrap gap-1.5">
-                                {ONGLETS.map((o) => (
-                                  <button
-                                    key={o.value}
-                                    onClick={() => setEditFrequency(o.value)}
-                                    className={`font-mono text-[9px] uppercase px-2 py-1 rounded-full border ${
-                                      editFrequency === o.value
-                                        ? "bg-thread text-paper border-thread"
-                                        : "text-ink-muted border-ink-faint"
-                                    }`}
-                                  >
-                                    {o.label}
-                                  </button>
-                                ))}
-                              </div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <input
-                                  type="date"
-                                  value={editDate}
-                                  onChange={(ev) =>
-                                    setEditDate(ev.target.value)
-                                  }
-                                  className="font-mono text-[11px] bg-transparent outline-none text-ink-muted border-b border-ink-faint/40"
+                          {isMonthOpen && (
+                            <div className="px-3 pb-3 space-y-2">
+                              {arbre[y].mois[m].mois.map((e) => (
+                                <EntryCard
+                                  key={e.id}
+                                  e={e}
+                                  labelOverride={`${MOIS[m]} ${y}`}
                                 />
-                                <select
-                                  value={editCollectionId}
-                                  onChange={(ev) =>
-                                    setEditCollectionId(ev.target.value)
-                                  }
-                                  className="font-mono text-[10px] bg-transparent outline-none text-ink-muted"
-                                >
-                                  <option value="">Sans collection</option>
-                                  {collections.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.title}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="flex justify-end gap-2 pt-1">
-                                <button
-                                  onClick={() => setEditingId(null)}
-                                  className="font-mono text-[10px] text-ink-faint uppercase"
-                                >
-                                  Annuler
-                                </button>
-                                <button
-                                  onClick={() => enregistrerEdition(e.id)}
-                                  disabled={savingEdit}
-                                  className="font-body text-[12px] font-medium px-3 py-1 rounded-full bg-thread text-paper disabled:opacity-50"
-                                >
-                                  {savingEdit ? "..." : "Enregistrer"}
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="font-body text-[13.5px] text-ink leading-relaxed">
-                              {e.content}
-                            </p>
-                          )}
+                              ))}
 
-                          {!isEditing && shareOpenFor === e.id && (
-                            <div className="mt-2 pt-2 border-t border-ink-faint/20">
-                              {circles.length === 0 ? (
-                                <p className="font-mono text-[10px] text-ink-faint">
-                                  Crée d'abord un cercle dans l'onglet
-                                  Cercles.
-                                </p>
-                              ) : (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {circles.map((c) => (
+                              {semaineKeys.map((w) => {
+                                const weekKey = `${y}-${m}-${w}`;
+                                const isWeekOpen = expandedWeek === weekKey;
+                                const bloc = arbre[y].mois[m].semaines[w];
+
+                                return (
+                                  <div
+                                    key={w}
+                                    className="rounded-[3px] bg-paper-card/40 overflow-hidden"
+                                  >
                                     <button
-                                      key={c.id}
-                                      onClick={() => partager(e.id, c.id)}
-                                      className="font-mono text-[9px] uppercase px-2 py-1 rounded-full border border-thread text-thread"
+                                      onClick={() =>
+                                        setExpandedWeek(
+                                          isWeekOpen ? null : weekKey
+                                        )
+                                      }
+                                      className="w-full flex items-center justify-between px-3 py-2"
                                     >
-                                      {c.name}
+                                      <span className="font-mono text-[11px] text-ink-muted">
+                                        Semaine {w}
+                                      </span>
+                                      <span className="font-mono text-[10px] text-ink-faint">
+                                        {compterSemaine(y, m, w)}{" "}
+                                        {isWeekOpen ? "▲" : "▼"}
+                                      </span>
                                     </button>
-                                  ))}
-                                </div>
-                              )}
-                              {shareFeedback && (
-                                <p className="font-mono text-[9px] text-ink-faint mt-1">
-                                  {shareFeedback}
-                                </p>
-                              )}
+
+                                    {isWeekOpen && (
+                                      <div className="px-3 pb-3 space-y-2">
+                                        {bloc.semaine.map((e) => (
+                                          <EntryCard
+                                            key={e.id}
+                                            e={e}
+                                            labelOverride={`Semaine ${w} · ${y}`}
+                                          />
+                                        ))}
+                                        {bloc.jours.map((e) => (
+                                          <EntryCard
+                                            key={e.id}
+                                            e={e}
+                                            labelOverride={labelJour(
+                                              e.event_date
+                                            )}
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
