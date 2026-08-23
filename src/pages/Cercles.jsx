@@ -10,6 +10,9 @@ export default function Cercles({ session }) {
   const [emailByCircle, setEmailByCircle] = useState({});
   const [addingMemberFor, setAddingMemberFor] = useState(null);
 
+  const [invitations, setInvitations] = useState([]);
+  const [acceptingId, setAcceptingId] = useState(null);
+
   const charger = async () => {
     setLoading(true);
     const { data: circlesData, error } = await supabase
@@ -20,6 +23,16 @@ export default function Cercles({ session }) {
 
     if (error) console.error(error);
     setCircles(circlesData || []);
+
+    const { data: invitData, error: invitError } = await supabase
+      .from("lf_circle_members")
+      .select("id, status, lf_circles(id, name)")
+      .eq("invited_email", session.user.email)
+      .eq("status", "pending");
+
+    if (invitError) console.error(invitError);
+    setInvitations(invitData || []);
+
     setLoading(false);
   };
 
@@ -62,6 +75,20 @@ export default function Cercles({ session }) {
     charger();
   };
 
+  const accepterInvitation = async (invitationId) => {
+    setAcceptingId(invitationId);
+    const { error } = await supabase
+      .from("lf_circle_members")
+      .update({ member_user_id: session.user.id, status: "accepted" })
+      .eq("id", invitationId);
+    setAcceptingId(null);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    charger();
+  };
+
   return (
     <div className="max-w-md mx-auto px-6 pt-10 pb-28">
       <h1 className="font-display text-[28px] text-ink mb-1">Cercles</h1>
@@ -69,6 +96,31 @@ export default function Cercles({ session }) {
         Regroupe famille et amis pour leur partager des entrées ou des
         collections entières.
       </p>
+
+      {invitations.length > 0 && (
+        <div className="mb-8 space-y-2">
+          <h2 className="font-mono text-[11px] tracking-[0.18em] uppercase text-thread mb-2">
+            Invitations reçues
+          </h2>
+          {invitations.map((inv) => (
+            <div
+              key={inv.id}
+              className="flex items-center justify-between rounded-[3px] bg-thread/10 border border-thread/30 px-4 py-3"
+            >
+              <span className="font-body text-[14px] text-ink">
+                {inv.lf_circles?.name || "Cercle"}
+              </span>
+              <button
+                onClick={() => accepterInvitation(inv.id)}
+                disabled={acceptingId === inv.id}
+                className="font-body text-[12px] font-medium px-3 py-1.5 rounded-full bg-thread text-paper disabled:opacity-50"
+              >
+                {acceptingId === inv.id ? "..." : "Accepter"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-2 mb-8">
         <input

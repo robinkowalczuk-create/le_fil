@@ -5,6 +5,7 @@ import BottomNav from "./components/BottomNav";
 import Accueil from "./pages/Accueil";
 import Passe from "./pages/Passe";
 import Cercles from "./pages/Cercles";
+import Projets from "./pages/Projets";
 import CollectionDetail from "./pages/CollectionDetail";
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
               <Route path="/" element={<Accueil session={session} />} />
               <Route path="/passe" element={<Passe session={session} />} />
               <Route path="/cercles" element={<Cercles session={session} />} />
+              <Route path="/projets" element={<Projets session={session} />} />
               <Route
                 path="/collection/:id"
                 element={<CollectionDetail session={session} />}

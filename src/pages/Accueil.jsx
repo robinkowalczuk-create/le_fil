@@ -21,7 +21,7 @@ export default function Accueil({ session }) {
   const [templates, setTemplates] = useState([]);
 
   const [texte, setTexte] = useState("");
-  const [freqSelect, setFreqSelect] = useState(["jour"]);
+  const [freq, setFreq] = useState("jour");
   const [collectionId, setCollectionId] = useState("");
   const [dateEntree, setDateEntree] = useState(todayISO());
   const [photoFiles, setPhotoFiles] = useState([]);
@@ -78,12 +78,6 @@ export default function Accueil({ session }) {
     chargerTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const toggleFreq = (f) => {
-    setFreqSelect((prev) =>
-      prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
-    );
-  };
 
   const handleSelectChange = (e) => {
     const val = e.target.value;
@@ -162,7 +156,7 @@ export default function Accueil({ session }) {
         collection_id: collectionId || null,
         content: texte.trim(),
         event_date: dateEntree,
-        frequencies: freqSelect,
+        frequency: freq,
       })
       .select()
       .single();
@@ -293,13 +287,16 @@ export default function Accueil({ session }) {
             className="font-body w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed placeholder:italic text-ink"
           />
 
-          <div className="flex flex-wrap gap-1.5 mt-3">
+          <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase mb-1.5">
+            Cette entrée concerne
+          </p>
+          <div className="flex flex-wrap gap-1.5 mt-1">
             {FREQUENCES.map((f) => {
-              const active = freqSelect.includes(f.value);
+              const active = freq === f.value;
               return (
                 <button
                   key={f.value}
-                  onClick={() => toggleFreq(f.value)}
+                  onClick={() => setFreq(f.value)}
                   className={`font-mono text-[10px] tracking-[0.08em] uppercase px-2.5 py-1 rounded-full border transition-colors ${
                     active
                       ? "bg-thread text-paper border-thread"
